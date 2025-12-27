@@ -8,14 +8,23 @@ This project implements a robust bimanual teleoperation and imitation learning s
 
 ---
 
+
 ## 🎥 Demo Highlights
 
-| **Open Panel** | **Switch Off** | **Voltage Check** |
-|:---:|:---:|:---:|
-| <img src="assets/Open_Panel.gif" width="100%"> | <img src="assets/Switch_off.gif" width="100%"> | <img src="assets/Voltage_Check.gif" width="100%"> |
-| *Door Opening Task* | *Safety Switch Off* | *Digital Multimeter Measurement* |
+### 🚪 Panel Opening
+<div align="center">
+  <img src="assets/Open_Panel.gif" width="100%">
+</div>
 
-*(Note: If videos do not autoplay, please download them from the `assets/` folder.)*
+### ⚡ Switch Off
+<div align="center">
+  <img src="assets/Switch_off.gif" width="100%">
+</div>
+
+### 🔋 Voltage Check
+<div align="center">
+  <img src="assets/Voltage_Check.gif" width="100%">
+</div>
 
 ---
 
@@ -26,19 +35,19 @@ The system operates on a distributed architecture across three compute nodes, sy
 ```mermaid
 graph TD
     subgraph Leader["Leader System (Operator)"]
-        G[GELLO Interface] -->|Joint Positions| C2[Control Hub (Computer 2)]
-        H[Human Operator] --> G
+        G["GELLO Interface"] -->|Joint Positions| C2["Control Hub (Computer 2)"]
+        H["Human Operator"] --> G
     end
 
     subgraph Follower["Follower System (Robot)"]
-        C2 -->|ZMQ: 6001| L[Left Panda]
-        C2 -->|ZMQ: 6001| R[Right Panda]
-        Cam[Wrist Cameras] -->|ZMQ: 7001/8001| C1[Inference Server (Computer 1)]
+        C2 -->|ZMQ: 6001| L["Left Panda"]
+        C2 -->|ZMQ: 6001| R["Right Panda"]
+        Cam["Wrist Cameras"] -->|ZMQ: 7001/8001| C1["Inference Server (Computer 1)"]
     end
 
     subgraph Inference["ACT Policy (Computer 1)"]
         C1 -->|Action Chunks| C2
-        M[ACT Model] -.-> C1
+        M["ACT Model"] -.-> C1
     end
 ```
 
