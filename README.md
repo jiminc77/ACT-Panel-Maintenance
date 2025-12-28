@@ -1,24 +1,21 @@
-# ACT-panel-maintenance: Energy Facility Maintenance
+# ACT-panel-maintenance: Manipulation for Energy Facility Management
 
-**Authors:** Intelligent Robotics Lab, ETRI
-**Project:** Energy Facility Maintenance using Dual-Arm Remote Operation
+**Project:** GIST, ETRI
 
 ## Abstract
 This project implements a robust bimanual teleoperation and imitation learning system for maintaining high-voltage energy facilities. Utilizing a **Leader-Follower** architecture with **Franka Emika Panda** robots and **GELLO** interfaces, the system achieves **>90% success rates** across three critical maintenance tasks: Panel Opening, Switch Operation, and Voltage Checking. The core control policy is trained using **Action Chunking with Transformers (ACT)**, enabling precise and resilient manipulation.
 
----
 
-
-## 🎥 Demo Highlights
-
-### 🚪 Panel Opening
-<div align="center">
-  <img src="assets/Open_Panel.gif" width="100%">
-</div>
+## Demo Highlights
 
 ### ⚡ Switch Off
 <div align="center">
   <img src="assets/Switch_off.gif" width="100%">
+</div>
+
+### 🚪 Panel Opening
+<div align="center">
+  <img src="assets/Open_Panel.gif" width="100%">
 </div>
 
 ### 🔋 Voltage Check
@@ -26,9 +23,7 @@ This project implements a robust bimanual teleoperation and imitation learning s
   <img src="assets/Voltage_Check.gif" width="100%">
 </div>
 
----
-
-## 🏗️ System Architecture
+## System Architecture
 
 The system operates on a distributed architecture across three compute nodes, synchronized via **ZeroMQ**.
 
@@ -62,9 +57,8 @@ graph TD
   - **Node 2 (Control Hub):** Robot Drivers, ZMQ Servers, Data Collection
   - **Node 3 (Auxiliary):** Right Arm Polymetis Server
 
----
 
-## 🚀 Installation
+## Installation
 
 ### 1. Clone the Repository
 ```bash
@@ -87,9 +81,8 @@ pip install -r requirements.txt
 - `gello` (included in `gello/` directory)
 - `act` (included in `act/` directory)
 
----
 
-## 💻 Usage
+## Usage
 
 ### Inference (Autonomous Mode)
 To run the trained policy:
@@ -103,19 +96,12 @@ To manipulate the robot using GELLO:
 python gello/scripts/run_env.py --agent gello --bimanual --use_webcam
 ```
 
----
-
-## 📊 Results
+## Results
 
 The system was evaluated on 3 tasks, with 20 trials each. A trial is considered successful if completed without collision or intervention.
 
 | Task | Trials | Successes | Success Rate |
 | :--- | :---: | :---: | :---: |
-| **Open Panel** | 20 | 19 | **95%** |
 | **Switch Off** | 20 | 18 | **90%** |
-| **Voltage Check** | 20 | 19 | **95%** |
-
----
-
-## 📄 License
-This project is licensed under the MIT License.
+| **Open Panel** | 20 | 20 | **100%** |
+| **Voltage Check** | 20 | 18 | **90%** |
