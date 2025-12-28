@@ -1,10 +1,9 @@
 # ACT-panel-maintenance: Manipulation for Energy Facility Management
 
-**Project:** GIST, ETRI
+GIST, ETRI
 
 ## Abstract
-This project implements a robust bimanual teleoperation and imitation learning system for maintaining high-voltage energy facilities. Utilizing a **Leader-Follower** architecture with **Franka Emika Panda** robots and **GELLO** interfaces, the system achieves **>90% success rates** across three critical maintenance tasks: Panel Opening, Switch Operation, and Voltage Checking. The core control policy is trained using **Action Chunking with Transformers (ACT)**, enabling precise and resilient manipulation.
-
+This project implements a robust bimanual teleoperation and imitation learning system for maintaining high-voltage energy facilities. Utilizing a **Leader-Follower** architecture with **Franka Emika Panda** robots and **[GELLO](https://github.com/wuphilipp/gello_software)** interfaces, the system achieves **>90% success rates** across three critical maintenance tasks: Panel Opening, Switch Operation, and Voltage Checking. The core control policy is trained using **[Action Chunking with Transformers (ACT)](https://github.com/MarkFzp/act-plus-plus?tab=readme-ov-file)**, enabling precise and resilient manipulation.
 
 ## Demo Highlights
 
@@ -29,33 +28,43 @@ The system operates on a distributed architecture across three compute nodes, sy
 
 ```mermaid
 graph TD
-    subgraph Leader["Leader System (Operator)"]
-        G["GELLO Interface"] -->|Joint Positions| C2["Control Hub (Computer 2)"]
-        H["Human Operator"] --> G
+    subgraph Computer1["Computer 1: AI Server"]
+        ACT["ACT Policy Model"]
+        Trainer["Training Process"]
     end
 
-    subgraph Follower["Follower System (Robot)"]
-        C2 -->|ZMQ: 6001| L["Left Panda"]
-        C2 -->|ZMQ: 6001| R["Right Panda"]
-        Cam["Wrist Cameras"] -->|ZMQ: 7001/8001| C1["Inference Server (Computer 1)"]
+    subgraph Computer2["Computer 2: Control Hub"]
+        ZMQ_R["ZMQ Server Robot (6001)"]
+        ZMQ_C["ZMQ Server Camera (7001/8001)"]
+        L_Panda["Left Panda (Local)"]
+        Gello["Gello Agents"]
     end
 
-    subgraph Inference["ACT Policy (Computer 1)"]
-        C1 -->|Action Chunks| C2
-        M["ACT Model"] -.-> C1
+    subgraph Computer3["Computer 3: Aux Control"]
+        Poly["Polymetis Server"]
+        R_Panda["Right Panda"]
     end
+
+    %% Connections
+    Computer1 <==>|ZMQ REQ/REP| Computer2
+    Computer2 <==>|Network| Computer3
+    Computer3 -->|Control| R_Panda
+    Computer2 -->|Control| L_Panda
+    
+    %% Data Flow
+    Gello -->|Teleop Commands| ZMQ_R
+    ZMQ_R -->|Joint Commands| L_Panda & Computer3
 ```
 
 ### Hardware Setup
 - **Robots:** 2x Franka Emika Panda (7-DoF)
-- **Teleoperation:** 2x GELLO (Dynamixel-based 1:1 mapping)
+- **Teleoperation:** 2x GELLO (Dynamixel-based)
 - **Vision:** 
-  - 2x Wrist Cameras (Logitech/RealSense) for Policy Inputs
-  - 1x Head Camera for Monitoring
+  - 2x Wrist Cameras (Logitech/RealSense) -> Streamed to Computer 1
 - **Compute:** 
-  - **Node 1 (AI Server):** ACT Training & Inference (RTX 3090/4090)
-  - **Node 2 (Control Hub):** Robot Drivers, ZMQ Servers, Data Collection
-  - **Node 3 (Auxiliary):** Right Arm Polymetis Server
+  - **Computer 1 (AI Server):** ACT Training & Inference (GPU)
+  - **Computer 2 (Control Hub):** Robot Drivers, ZMQ Servers, Data Collection
+  - **Computer 3 (Auxiliary):** Right Arm Polymetis Server
 
 
 ## Installation
@@ -66,35 +75,97 @@ git clone https://github.com/your-org/ACT-panel-maintenance.git
 cd ACT-panel-maintenance
 ```
 
-### 2. Environment Setup
+### 2. Environment Setup (Computer 1 & 2)
 We provide a unified requirements file. It is recommended to use Conda.
 
 ```bash
-conda create -n act_maintenance python=3.9
+conda create -n act_maintenance python=3.8
 conda activate act_maintenance
+# Install dependencies (Computer 1 needs PyTorch/CUDA, Computer 2 needs Robot drivers)
 pip install -r requirements.txt
+# Initialize submodules (Computer 2)
+cd gello && git submodule update --init --recursive
 ```
 
-### 3. Key Dependencies
-- `torch >= 2.0.0`
-- `dm_control` (Mujoco bindings)
-- `gello` (included in `gello/` directory)
-- `act` (included in `act/` directory)
+**Note**: Computers 2 and 3 must have **[Polymetis](https://facebookresearch.github.io/fairo/polymetis/)** installed locally to control the robots.
+
 
 
 ## Usage
 
-### Inference (Autonomous Mode)
-To run the trained policy:
+The system workflow consists of three main phases: **Startup**, **Data Collection**, and **Inference**.
+
+### Phase 1: Hardware & Server Startup
+The system requires coordinated startup across Computer 2 and Computer 3.
+
+1.  **Robot Activation (Polymetis):**
+    *   **Computer 3 (Right Arm):**
+        ```bash
+        launch_robot.py robot_client=franka_hardware robot_client.executable_cfg.robot_ip=xxx.xx.xxx.xxx
+        launch_gripper.py gripper=franka_hand gripper.robot_ip=xxx.xx.xxx.xxx
+        ```
+    *   **Computer 2 (Left Arm):**
+        ```bash
+        launch_robot.py robot_client=franka_hardware robot_client.executable_cfg.robot_ip=xxx.xx.xxx.xxx
+        launch_gripper.py gripper=franka_hand gripper.robot_ip=xxx.xx.xxx.xxx
+        ```
+
+2.  **Control Hub Initialization (Computer 2):**
+    Launch the ZMQ server to coordinate both robots.
+    ```bash
+    python gello/experiments/launch_nodes.py --robot=bimanual_panda --hostname=0.0.0.0 --robot_port=6001
+    ```
+
+### Phase 2: Data Collection (Teleoperation)
+Run these steps on **Computer 2**.
+
+1.  **Calibration (Zeroing):**
+    Before collecting data, ensure Gello joints are aligned with the robot.
+    ```bash
+    python gello/scripts/gello_get_offset.py --port /dev/serial/by-id/YOUR_GELLO_PORT
+    ```
+
+2.  **Start Teleoperation:**
+    Run the environment. **Note:** Cameras are handled automatically by this script.
+    ```bash
+    python gello/scripts/run_env.py \
+        --robot_port=6001 \
+        --hostname=xxx.xx.xxx.xxx \
+        --bimanual \
+        --use_save_interface \
+        --use_webcam \
+        --agent=gello
+    ```
+    *   Data is saved to `~/bc_data/`.
+    *   **Post-Processing:** Convert `.pkl` to `.hdf5` on Computer 2, then SCP to Computer 1 for training.
+
+### Phase 3: Training (Computer 1)
+Once data is transferred to Computer 1:
 ```bash
-python act/panda_inference.py --task_name switch_off --ckpt_dir checkpoints/switch_off
+cd act
+python imitate_episodes.py \
+    --task_name switch_off \
+    --ckpt_dir ../checkpoints/switch_off \
+    --policy_class ACT \
+    --batch_size 16 --num_steps 20000
 ```
 
-### Teleoperation (Data Collection)
-To manipulate the robot using GELLO:
-```bash
-python gello/scripts/run_env.py --agent gello --bimanual --use_webcam
-```
+### Phase 4: Inference (Computer 1)
+For autonomous execution, you must manually launch the camera servers on Computer 2, as `panda_inference.py` does not manage them.
+
+1.  **Computer 2 (Prepare Servers):**
+    *   Ensure `launch_nodes.py` (Robot Server) is running (from Phase 1).
+    *   **Launch Camera Servers:**
+        ```bash
+        python gello/experiments/launch_dual_camera.py --devices /dev/video0 /dev/video4 --ports 7001 8001
+        ```
+
+2.  **Computer 1 (Run Policy):**
+    ```bash
+    python act/panda_inference.py \
+        --task_name switch_off \
+        --ckpt_dir ../checkpoints/switch_off
+    ```
 
 ## Results
 
