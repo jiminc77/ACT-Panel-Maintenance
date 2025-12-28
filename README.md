@@ -48,12 +48,13 @@ graph TD
     %% Connections
     Computer1 <==>|ZMQ REQ/REP| Computer2
     Computer2 <==>|Network| Computer3
-    Computer3 -->|Control| R_Panda
+    Poly -->|Control| R_Panda
     Computer2 -->|Control| L_Panda
     
     %% Data Flow
     Gello -->|Teleop Commands| ZMQ_R
-    ZMQ_R -->|Joint Commands| L_Panda & Computer3
+    ZMQ_R -->|Joint Commands| L_Panda
+    ZMQ_R -->|Joint Commands| Poly
 ```
 
 ### Hardware Setup
