@@ -27,13 +27,14 @@ This project implements a robust bimanual teleoperation and imitation learning s
 The system operates on a distributed architecture across three compute nodes, synchronized via **ZeroMQ**.
 
 ```mermaid
-graph TD
+graph LR
     subgraph Computer1["Computer 1: AI Server"]
         ACT["ACT Policy Model"]
         Trainer["Training Process"]
     end
 
     subgraph Computer2["Computer 2: Control Hub"]
+        direction TB
         ZMQ_R["ZMQ Server Robot (6001)"]
         ZMQ_C["ZMQ Server Camera (7001/8001)"]
         L_Panda["Left Panda (Local)"]
@@ -41,23 +42,30 @@ graph TD
     end
 
     subgraph Computer3["Computer 3: Aux Control"]
+        direction TB
         Poly["Polymetis Server"]
         R_Panda["Right Panda"]
     end
 
     %% Connections
-    Computer1 <==>|ZMQ REQ/REP| Computer2
-    Computer2 <==>|Network| Computer3
-    Poly -->|Control| R_Panda
-    Computer2 -->|Control| L_Panda
+    ACT <==>|ZMQ REQ/REP| ZMQ_R
     
-    %% Data Flow
-    Gello -->|Teleop Commands| ZMQ_R
-    ZMQ_R -->|Joint Commands| L_Panda
-    ZMQ_R -->|Joint Commands| Poly
+    %% Internal C2
+    Gello -->|Teleop| ZMQ_R
+    ZMQ_R -->|Joint Cmd| L_Panda
+    
+    %% C2 -> C3
+    ZMQ_R -->|Network Cmd| Poly
+    
+    %% C3 Internal
+    Poly -->|Control| R_Panda
 ```
 
 ### Hardware Setup
+<div align="center">
+  <img src="assets/Setting.png" width="80%">
+</div>
+
 - **Robots:** 2x Franka Emika Panda (7-DoF)
 - **Teleoperation:** 2x GELLO (Dynamixel-based)
 - **Vision:** 
